@@ -6,15 +6,6 @@ import AppKit
 import Foundation
 
 struct ResultListView: View {
-    private enum AIBlock {
-        case heading(String)
-        case bullet(String)
-        case numbered(index: String, text: String)
-        case paragraph(String)
-        case code(String)
-        case divider
-    }
-    
     private struct BatterySnapshot {
         let level: Int
         let health: Int?
@@ -34,8 +25,6 @@ struct ResultListView: View {
     let inlineText: String
     let onSelect: (AppInfo) -> Void
     
-    @AppStorage(SynapseSettings.Keys.richAIFormatting) private var richAIFormatting = SynapseSettings.defaultRichAIFormatting
-    @AppStorage(SynapseSettings.Keys.aiVisualStyle) private var aiVisualStyle = SynapseSettings.defaultAIVisualStyle
     
     private var hasFileResults: Bool {
         !(executionResult?.fileResults?.isEmpty ?? true)
@@ -535,8 +524,8 @@ struct ResultListView: View {
                     .padding(.top, 4)
             }
             
-            aiCard {
-                formattedAIResponse(inlineText)
+            cleanAICard {
+                AIResponseRenderer(text: cleanAIText(inlineText))
             }
                 .padding(.horizontal, 20)
                 .padding(.bottom, 4)
@@ -785,347 +774,39 @@ struct ResultListView: View {
     
     private func aiResultView(_ result: ExecutionResult) -> some View {
         VStack(alignment: .leading, spacing: 4) {
-            aiCard {
-                formattedAIResponse(result.output ?? "完成")
+            cleanAICard {
+                AIResponseRenderer(text: cleanAIText(result.output ?? "完成"))
             }
                 .padding(.horizontal, 20)
                 .padding(.vertical, 8)
         }
     }
     
-    // MARK: - AI 富文本格式化
-    
+    // MARK: - Clean AI Card
+
     @ViewBuilder
-    private func aiCard<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
-        ZStack {
-            // Matrix rain background
-            if isMatrixStyle {
-                MatrixRainBackground(columnCount: 25)
-                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                    .opacity(0.15)
-            }
-            
-            content()
-                .padding(.horizontal, 14)
-                .padding(.vertical, 12)
-                .frame(maxWidth: .infinity, alignment: .leading)
-        }
-        .background(
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .fill(aiCardFill)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .stroke(isMatrixStyle ? Color.green.opacity(0.45) : TerminalTheme.line, lineWidth: 0.8)
-        )
-        .modifier(ConditionalMatrixGlowModifier(isMatrix: isMatrixStyle))
-        .overlay {
-            if isMatrixStyle {
-                AnimatedMatrixScanlineOverlay()
-                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-            }
-        }
-        .shadow(color: isMatrixStyle ? Color.green.opacity(0.20) : .clear, radius: isMatrixStyle ? 8 : 0)
-    }
-    
-    @ViewBuilder
-    private func formattedAIResponse(_ text: String) -> some View {
-        let prepared = normalizedAITextForDisplay(text)
-        if richAIFormatting,
-           let attributed = try? AttributedString(
-               markdown: prepared,
-               options: AttributedString.MarkdownParsingOptions(
-                   interpretedSyntax: .full,
-                   failurePolicy: .returnPartiallyParsedIfPossible
-               )
-           ) {
-            Text(attributed)
-                .font(isMatrixStyle ? .system(size: 14, design: .monospaced) : .system(size: 14))
-                .foregroundColor(isMatrixStyle ? .green.opacity(0.95) : .primary)
-                .lineSpacing(isMatrixStyle ? 7 : 5)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .fixedSize(horizontal: false, vertical: true)
-                .textSelection(.enabled)
-        } else {
-            Text(prepared)
-                .font(isMatrixStyle ? .system(size: 14, design: .monospaced) : .system(size: 14))
-                .foregroundColor(isMatrixStyle ? .green.opacity(0.95) : .primary)
-                .lineSpacing(isMatrixStyle ? 7 : 5)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .fixedSize(horizontal: false, vertical: true)
-                .textSelection(.enabled)
-        }
+    private func cleanAICard<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
+        content()
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(TerminalTheme.cardFill)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .stroke(TerminalTheme.line, lineWidth: 0.8)
+            )
     }
 
-    private func normalizedAITextForDisplay(_ text: String) -> String {
-        var output = text
+    private func cleanAIText(_ text: String) -> String {
+        text
             .replacingOccurrences(of: "\r\n", with: "\n")
             .trimmingCharacters(in: .whitespacesAndNewlines)
-
-        guard !output.isEmpty else { return output }
-
-        let hasMarkdownStructure = output.contains("\n#") || output.contains("- ") || output.contains("1.")
-        if !hasMarkdownStructure {
-            output = output.replacingOccurrences(
-                of: #"(?<![#\n])(结论|要点|建议|步骤|风险|总结|说明)\s*[:：]?"#,
-                with: "\n## $1\n",
-                options: .regularExpression
-            )
-            output = output.replacingOccurrences(
-                of: #"(?<!\n)(\d+[\.、])\s*"#,
-                with: "\n$1 ",
-                options: .regularExpression
-            )
-            output = output.replacingOccurrences(
-                of: #"([。！？])\s*(?=[^\n])"#,
-                with: "$1\n\n",
-                options: .regularExpression
-            )
-        }
-
-        output = output.replacingOccurrences(of: #"\n{3,}"#, with: "\n\n", options: .regularExpression)
-
-        if isMatrixStyle {
-            // Generate dynamic Matrix-style headers
-            let signalStrength = Int.random(in: 85...100)
-            let decryptionStatus = ["COMPLETE", "VERIFIED", "SECURED"].randomElement() ?? "COMPLETE"
-            let accessStatus = ["GRANTED", "AUTHORIZED", "ACTIVE"].randomElement() ?? "GRANTED"
-            
-            let header = """
-## MATRIX::OUTPUT
-> ACCESS_GRANTED: \(accessStatus)
-> SIGNAL_STRENGTH: \(signalStrength)%
-> DECRYPTION: \(decryptionStatus)
-> NEURAL_LINK: ONLINE
-> TIMESTAMP: \(formatMatrixTimestamp())
-
-"""
-            
-            if !output.hasPrefix("## MATRIX::OUTPUT") {
-                output = header + output
-            }
-        }
-
-        return output
+            .replacingOccurrences(of: #"\n{3,}"#, with: "\n\n", options: .regularExpression)
     }
     
-    private func formatMatrixTimestamp() -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "HH:mm:ss.SSS"
-        return formatter.string(from: Date())
-    }
-
-    private var isMatrixStyle: Bool {
-        aiVisualStyle.lowercased() == "matrix"
-    }
-
-    private var aiCardFill: AnyShapeStyle {
-        if isMatrixStyle {
-            return AnyShapeStyle(matrixCardFill)
-        }
-        return AnyShapeStyle(TerminalTheme.cardFill)
-    }
-
-    private var matrixCardFill: LinearGradient {
-        LinearGradient(
-            colors: [
-                Color(red: 0.03, green: 0.08, blue: 0.04),
-                Color(red: 0.02, green: 0.06, blue: 0.03),
-                Color(red: 0.01, green: 0.04, blue: 0.02),
-            ],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
-    }
-    
-    @ViewBuilder
-    private func aiBlockView(_ block: AIBlock) -> some View {
-        switch block {
-        case .heading(let title):
-            Text(title)
-                .font(.system(size: 15, weight: .semibold))
-                .foregroundColor(.accentColor)
-                .textSelection(.enabled)
-        case .bullet(let text):
-            HStack(alignment: .top, spacing: 7) {
-                Text("•")
-                    .font(.system(size: 14, weight: .bold))
-                    .foregroundColor(.secondary)
-                markdownText(text, font: .system(size: 14), color: .primary)
-            }
-        case .numbered(let index, let text):
-            HStack(alignment: .top, spacing: 7) {
-                Text("\(index).")
-                    .font(.system(size: 13, weight: .bold, design: .monospaced))
-                    .foregroundColor(.secondary)
-                markdownText(text, font: .system(size: 14), color: .primary)
-            }
-        case .paragraph(let text):
-            markdownText(text, font: .system(size: 14), color: .primary)
-        case .code(let code):
-            ScrollView(.horizontal, showsIndicators: false) {
-                Text(code)
-                    .font(.system(size: 12, design: .monospaced))
-                    .foregroundColor(.primary)
-                    .textSelection(.enabled)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 8)
-            }
-            .background(Color.primary.opacity(0.06))
-            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .stroke(TerminalTheme.line, lineWidth: 0.7)
-            )
-        case .divider:
-            Rectangle()
-                .fill(TerminalTheme.line)
-                .frame(height: 1)
-        }
-    }
-    
-    private func parseAIBlocks(_ text: String) -> [AIBlock] {
-        let normalized = text.replacingOccurrences(of: "\r\n", with: "\n")
-        var blocks: [AIBlock] = []
-        var insideCode = false
-        var codeLines: [String] = []
-        
-        for rawLine in normalized.components(separatedBy: .newlines) {
-            let trimmed = rawLine.trimmingCharacters(in: .whitespacesAndNewlines)
-            
-            if trimmed.hasPrefix("```") {
-                if insideCode {
-                    if !codeLines.isEmpty {
-                        blocks.append(.code(codeLines.joined(separator: "\n")))
-                        codeLines.removeAll()
-                    }
-                    insideCode = false
-                } else {
-                    insideCode = true
-                }
-                continue
-            }
-            
-            if insideCode {
-                codeLines.append(rawLine)
-                continue
-            }
-            
-            if trimmed.isEmpty {
-                continue
-            }
-            
-            if ["---", "——", "___"].contains(trimmed) {
-                blocks.append(.divider)
-                continue
-            }
-            
-            if isSemanticHeading(trimmed) {
-                blocks.append(.heading(trimmed))
-                continue
-            }
-            
-            if trimmed.hasPrefix("#") {
-                let title = trimmed.replacingOccurrences(of: "^#+\\s*", with: "", options: .regularExpression)
-                blocks.append(.heading(title))
-                continue
-            }
-            
-            if let bullet = parseBulletLine(trimmed) {
-                blocks.append(.bullet(bullet))
-                continue
-            }
-            
-            if let numbered = parseNumberedLine(trimmed) {
-                blocks.append(.numbered(index: numbered.index, text: numbered.text))
-                continue
-            }
-            
-            blocks.append(.paragraph(trimmed))
-        }
-        
-        if insideCode, !codeLines.isEmpty {
-            blocks.append(.code(codeLines.joined(separator: "\n")))
-        }
-        return blocks.isEmpty ? [.paragraph(text)] : blocks
-    }
-    
-    private func parseBulletLine(_ line: String) -> String? {
-        let prefixes = ["- ", "* ", "• ", "· "]
-        for prefix in prefixes where line.hasPrefix(prefix) {
-            return String(line.dropFirst(prefix.count)).trimmingCharacters(in: .whitespacesAndNewlines)
-        }
-        return nil
-    }
-    
-    private func parseNumberedLine(_ line: String) -> (index: String, text: String)? {
-        let chars = Array(line)
-        var i = 0
-        var digits = ""
-        
-        while i < chars.count, chars[i].isNumber {
-            digits.append(chars[i])
-            i += 1
-        }
-        
-        guard !digits.isEmpty, i < chars.count else { return nil }
-        let separator = chars[i]
-        guard separator == "." || separator == "、" || separator == ")" else { return nil }
-        i += 1
-        
-        while i < chars.count, chars[i].isWhitespace {
-            i += 1
-        }
-        
-        guard i < chars.count else { return nil }
-        let text = String(chars[i...]).trimmingCharacters(in: .whitespacesAndNewlines)
-        return text.isEmpty ? nil : (digits, text)
-    }
-    
-    @ViewBuilder
-    private func markdownText(_ text: String, font: Font, color: Color) -> some View {
-        if richAIFormatting,
-           let attributed = try? AttributedString(
-               markdown: text,
-               options: AttributedString.MarkdownParsingOptions(
-                   interpretedSyntax: .inlineOnlyPreservingWhitespace,
-                   failurePolicy: .returnPartiallyParsedIfPossible
-               )
-           ) {
-            Text(attributed)
-                .font(font)
-                .foregroundColor(color)
-                .textSelection(.enabled)
-        } else {
-            Text(text)
-                .font(font)
-                .foregroundColor(color)
-                .textSelection(.enabled)
-        }
-    }
-    
-    private func isSemanticHeading(_ line: String) -> Bool {
-        let normalized = line
-            .replacingOccurrences(of: "：", with: "")
-            .replacingOccurrences(of: ":", with: "")
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        return ["结论", "要点", "总结", "步骤", "建议", "风险", "说明", "原因"].contains(normalized)
-    }
-}
-
-// MatrixScanlineOverlay has been replaced with AnimatedMatrixScanlineOverlay in TerminalTheme.swift
-
-private struct ConditionalMatrixGlowModifier: ViewModifier {
-    let isMatrix: Bool
-    
-    func body(content: Content) -> some View {
-        if isMatrix {
-            content.matrixGlowPulseBorder()
-        } else {
-            content
-        }
-    }
 }
 
 private struct GlowingBrainIndicator: View {

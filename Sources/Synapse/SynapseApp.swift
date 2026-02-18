@@ -26,14 +26,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var settingsObserver: NSObjectProtocol?
     private var settingsWindowController: NSWindowController?
     private var lastHotkeyPreset: String = SynapseSettings.hotkeyPreset
-    
+
+    private var rayBubblePanel: RayBubblePanelManager?
+    private let rayEngine = RayVoiceEngine()
+    private let intentEngine = IntentEngine()
+    private let intentExecutor = IntentExecutor()
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         print("Synapse 启动中...")
         
         NSApp.setActivationPolicy(.accessory)
         setupStatusItem()
         
-        // 悬浮窗
+        // Keyboard mode: Synapse floating panel
         let heightNotifier = HeightNotifier()
         let panel = PanelManager()
         panel.setup(
@@ -43,31 +48,81 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         )
         self.panelManager = panel
         
-        // 全局快捷键
+        // Voice mode: Ray bubble panel
+        setupRayBubble()
+
+        // Global hotkey for keyboard mode
         hotkeyManager = HotkeyManager { [weak self] in
             self?.panelManager?.toggle()
         }
         hotkeyManager?.register()
         observeSettingsChanges()
 
-        // App 索引：先读缓存，再后台刷新一次，便于启动/关闭应用模糊匹配
         _ = AppIndexer.shared.loadCache()
         Task { await AppIndexer.shared.indexAll() }
         
-        // ESC 关闭
         dismissObserver = NotificationCenter.default.addObserver(
             forName: .synapseDismiss, object: nil, queue: .main
         ) { [weak self] _ in
             DispatchQueue.main.async { self?.panelManager?.hide() }
         }
         
-        // 启动剪贴板监控
         ClipboardModule.shared.startMonitoring()
         
-        // 启动后显示
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { panel.show() }
         
         print("✅ Synapse 就绪 — 按 \(HotkeyManager.currentHotkeyTitle()) 唤醒")
+        if SynapseSettings.rayEnabled {
+            print("✅ Ray 语音助手就绪 — 说 \"Hi Ray\" 唤醒")
+        }
+    }
+
+    private func setupRayBubble() {
+        let bubblePanel = RayBubblePanelManager()
+        let bubbleView = RayBubbleView(engine: rayEngine, onDismiss: { [weak self] in
+            self?.rayEngine.dismissResponse()
+            self?.rayBubblePanel?.collapse()
+        })
+        bubblePanel.setup(with: bubbleView)
+        self.rayBubblePanel = bubblePanel
+
+        rayEngine.onCommand = { [weak self] command in
+            guard let self else { return }
+            self.handleRayCommand(command)
+        }
+
+        rayEngine.onStateChanged = { [weak self] state in
+            guard let self else { return }
+            switch state {
+            case .listening, .thinking:
+                self.rayBubblePanel?.expand()
+            case .responding:
+                self.rayBubblePanel?.expand()
+            case .idle:
+                break
+            }
+        }
+
+        if SynapseSettings.rayEnabled {
+            bubblePanel.show()
+            rayEngine.start()
+        }
+    }
+
+    private func handleRayCommand(_ command: String) {
+        rayEngine.state = .thinking
+
+        Task {
+            let intent = intentEngine.recognize(command)
+            let result = await intentExecutor.execute(intent, recordConversation: true)
+            let output = result.output ?? (result.isSuccess ? "done" : "failed")
+
+            rayEngine.state = .responding(output)
+
+            if SynapseSettings.rayAutoSpeak {
+                rayEngine.speak(output)
+            }
+        }
     }
     
     private func setupStatusItem() {

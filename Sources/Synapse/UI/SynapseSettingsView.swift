@@ -31,6 +31,11 @@ struct SynapseSettingsView: View {
     @AppStorage(SynapseSettings.Keys.voiceLocale) private var voiceLocale = SynapseSettings.defaultVoiceLocale
     @AppStorage(SynapseSettings.Keys.hotkeyPreset) private var hotkeyPreset = SynapseSettings.defaultHotkeyPreset
 
+    @AppStorage(SynapseSettings.Keys.rayEnabled) private var rayEnabled = SynapseSettings.defaultRayEnabled
+    @AppStorage(SynapseSettings.Keys.rayWakeWords) private var rayWakeWords = SynapseSettings.defaultRayWakeWords
+    @AppStorage(SynapseSettings.Keys.rayAutoSpeak) private var rayAutoSpeak = SynapseSettings.defaultRayAutoSpeak
+    @AppStorage(SynapseSettings.Keys.rayPosition) private var rayPosition = SynapseSettings.defaultRayPosition
+
     init(embedded: Bool = false, onClose: (() -> Void)? = nil) {
         self.embedded = embedded
         self.onClose = onClose
@@ -203,6 +208,51 @@ struct SynapseSettingsView: View {
                     .padding(.vertical, 6)
                 } label: {
                     Text("语音链路")
+                        .foregroundColor(.secondary)
+                        .font(.system(size: 12, weight: .semibold))
+                }
+
+                GroupBox {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Toggle("启用 Ray 语音宠物", isOn: $rayEnabled)
+
+                        HStack {
+                            Text("唤醒词（逗号分隔）")
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundColor(.secondary)
+                            Spacer()
+                            TextField("hi ray,hey ray", text: $rayWakeWords)
+                                .textFieldStyle(.roundedBorder)
+                                .frame(width: 200)
+                        }
+
+                        Toggle("Ray 语音播报回答", isOn: $rayAutoSpeak)
+
+                        HStack {
+                            Text("气泡位置")
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundColor(.secondary)
+                            Spacer()
+                            Picker("", selection: $rayPosition) {
+                                Text("右下").tag("bottom_right")
+                                Text("左下").tag("bottom_left")
+                                Text("右上").tag("top_right")
+                                Text("左上").tag("top_left")
+                            }
+                            .pickerStyle(.menu)
+                            .frame(width: 200)
+                        }
+
+                        Text("说 \"Hi Ray\" 或 \"Hey Ray\" 唤醒语音宠物，无需键盘操作。")
+                            .font(.system(size: 11))
+                            .foregroundColor(.secondary)
+                    }
+                    .toggleStyle(.switch)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(.primary)
+                    .padding(.vertical, 6)
+                } label: {
+                    Text("Ray 语音宠物")
                         .foregroundColor(.secondary)
                         .font(.system(size: 12, weight: .semibold))
                 }

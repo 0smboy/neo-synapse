@@ -24,6 +24,10 @@ enum SynapseSettings {
         static let voiceSpeakResponse = "synapse.voice.speakResponse"
         static let voiceWakeWord = "synapse.voice.wakeWord"
         static let voiceLocale = "synapse.voice.locale"
+        static let rayEnabled = "synapse.ray.enabled"
+        static let rayWakeWords = "synapse.ray.wakeWords"
+        static let rayAutoSpeak = "synapse.ray.autoSpeak"
+        static let rayPosition = "synapse.ray.position"
         static let panelWidth = "synapse.ui.panelWidth"
         static let hotkeyPreset = "synapse.ui.hotkeyPreset"
     }
@@ -51,6 +55,10 @@ enum SynapseSettings {
     static let defaultVoiceSpeakResponse = true
     static let defaultVoiceWakeWord = "synapse"
     static let defaultVoiceLocale = "zh-CN"
+    static let defaultRayEnabled = true
+    static let defaultRayWakeWords = "hi ray,hey ray"
+    static let defaultRayAutoSpeak = true
+    static let defaultRayPosition = "bottom_right"
     static let defaultPanelWidth = 900.0
     static let defaultHotkeyPreset = "option_space"
 
@@ -219,6 +227,30 @@ enum SynapseSettings {
         set { store.set(newValue.trimmingCharacters(in: .whitespacesAndNewlines), forKey: Keys.voiceLocale) }
     }
 
+    static var rayEnabled: Bool {
+        get { bool(for: Keys.rayEnabled, defaultValue: defaultRayEnabled) }
+        set { store.set(newValue, forKey: Keys.rayEnabled) }
+    }
+
+    static var rayWakeWords: String {
+        get { string(for: Keys.rayWakeWords, defaultValue: defaultRayWakeWords) }
+        set { store.set(newValue.trimmingCharacters(in: .whitespacesAndNewlines), forKey: Keys.rayWakeWords) }
+    }
+
+    static var rayAutoSpeak: Bool {
+        get { bool(for: Keys.rayAutoSpeak, defaultValue: defaultRayAutoSpeak) }
+        set { store.set(newValue, forKey: Keys.rayAutoSpeak) }
+    }
+
+    static var rayPosition: String {
+        get {
+            let value = string(for: Keys.rayPosition, defaultValue: defaultRayPosition).lowercased()
+            let valid = ["bottom_right", "bottom_left", "top_right", "top_left"]
+            return valid.contains(value) ? value : defaultRayPosition
+        }
+        set { store.set(newValue.trimmingCharacters(in: .whitespacesAndNewlines).lowercased(), forKey: Keys.rayPosition) }
+    }
+
     static var panelWidth: Double {
         get { double(for: Keys.panelWidth, defaultValue: defaultPanelWidth) }
         set { store.set(min(1600, max(680, newValue)), forKey: Keys.panelWidth) }
@@ -290,6 +322,10 @@ enum SynapseSettings {
         voiceSpeakResponse = defaultVoiceSpeakResponse
         voiceWakeWord = defaultVoiceWakeWord
         voiceLocale = defaultVoiceLocale
+        rayEnabled = defaultRayEnabled
+        rayWakeWords = defaultRayWakeWords
+        rayAutoSpeak = defaultRayAutoSpeak
+        rayPosition = defaultRayPosition
         panelWidth = defaultPanelWidth
         hotkeyPreset = defaultHotkeyPreset
     }
