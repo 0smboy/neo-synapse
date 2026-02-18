@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="${1:-v1.3.1}"
+VERSION="${1:-v2.0.0}"
 APP_NAME="Synapse"
-BUNDLE_ID="com.oboy.synapse"
+BUNDLE_ID="com.oboy.neo-synapse"
 MIN_MACOS="14.0"
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 BUILD_DIR="$ROOT_DIR/.build/arm64-apple-macosx/release"
 DIST_DIR="$ROOT_DIR/dist/release/$VERSION"
 APP_DIR="$DIST_DIR/$APP_NAME.app"
-ZIP_NAME="$APP_NAME-$VERSION-macos-arm64.zip"
+ZIP_NAME="NeoSynapse-$VERSION-macos-arm64.zip"
 ZIP_PATH="$DIST_DIR/$ZIP_NAME"
 ICON_ICNS_SRC="$ROOT_DIR/Sources/Synapse/Resources/AppIcon/Synapse.icns"
 
@@ -39,7 +39,7 @@ cat > "$APP_DIR/Contents/Info.plist" <<PLIST
   <key>CFBundleName</key>
   <string>$APP_NAME</string>
   <key>CFBundleDisplayName</key>
-  <string>$APP_NAME</string>
+  <string>Neo-Synapse</string>
   <key>CFBundleIdentifier</key>
   <string>$BUNDLE_ID</string>
   <key>CFBundleExecutable</key>
@@ -57,11 +57,11 @@ cat > "$APP_DIR/Contents/Info.plist" <<PLIST
   <key>CFBundleIconFile</key>
   <string>Synapse</string>
   <key>NSAppleEventsUsageDescription</key>
-  <string>Synapse 需要自动化权限以执行系统命令与应用控制。</string>
+  <string>Neo-Synapse needs Automation to run system commands and control apps.</string>
   <key>NSMicrophoneUsageDescription</key>
-  <string>Synapse 需要麦克风权限来进行实时语音识别与唤醒词监听。</string>
+  <string>Neo-Synapse needs Microphone for real-time speech recognition and Ray voice pet wake word.</string>
   <key>NSSpeechRecognitionUsageDescription</key>
-  <string>Synapse 需要语音识别权限以将语音命令转换为文本并执行。</string>
+  <string>Neo-Synapse needs Speech Recognition to convert voice commands to text.</string>
 </dict>
 </plist>
 PLIST
